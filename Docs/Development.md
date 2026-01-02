@@ -47,3 +47,18 @@
 ```bash
 WORKSPACE_ID=your_workspace_id scripts/send-sentry-webhook.sh
 ```
+
+## Slack integration setup
+
+1. Create a Slack app and set redirect URL:
+   - `http://localhost:3000/api/integrations/slack/callback` (local)
+   - `https://<ngrok-host>/api/integrations/slack/callback` (ngrok)
+2. Configure interactivity URL:
+   - `https://<ngrok-host>/webhooks/slack/actions`
+3. Set environment variables:
+   - `SLACK_CLIENT_ID`
+   - `SLACK_CLIENT_SECRET`
+   - `SLACK_REDIRECT_URI`
+   - `SLACK_SIGNING_SECRET`
+   - `ENCRYPTION_KEY`
+   - Ensure these exist in `apps/web/.env` for Next.js routes.

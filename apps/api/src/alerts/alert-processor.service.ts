@@ -47,7 +47,7 @@ export class AlertProcessorService {
 
     const shouldNotify = this.evaluateRoutingRules();
     if (shouldNotify) {
-      await this.queueNotificationStub(workspaceId, group.id, event.id);
+      await this.queueNotificationStub(workspaceId, group.id);
     }
 
     return { duplicate: false, groupId: group.id, eventId: event.id };
@@ -58,12 +58,11 @@ export class AlertProcessorService {
     return true;
   }
 
-  private async queueNotificationStub(workspaceId: string, groupId: string, eventId: string) {
+  private async queueNotificationStub(workspaceId: string, groupId: string) {
     try {
       await this.queueService.addJob('notifications', 'alert-created', {
         workspaceId,
-        groupId,
-        eventId,
+        alertGroupId: groupId,
       });
     } catch (error) {
       this.logger.warn('Notification queue unavailable', { error });

@@ -12,6 +12,7 @@ async function bootstrap() {
   app.useLogger(app.get(Logger));
   app.use('/webhooks/clerk', express.raw({ type: '*/*' }));
   app.use('/webhooks/sentry', express.raw({ type: '*/*' }));
+  app.use('/webhooks/slack/actions', express.raw({ type: '*/*' }));
 
   app.enableCors({
     origin: (origin, callback) => {
