@@ -1,0 +1,17 @@
+{
+  "id": "1234567890",
+  "project": "signalcraft-api",
+  "project_slug": "signalcraft-api",
+  "url": "https://sentry.io/organizations/example/issues/1234567890/",
+  "event": {
+    "event_id": "e8d7a3c2f4b54e4a8b1f9d42c5a12345",
+    "timestamp": "2026-01-02T12:00:00Z",
+    "level": "error",
+    "title": "TypeError: Cannot read property 'foo' of undefined",
+    "message": "TypeError: Cannot read property 'foo' of undefined",
+    "culprit": "src/api/users.ts",
+    "environment": "production",
+    "fingerprint": ["{{ default }}"],
+    "tags": [["environment", "production"], ["service", "api"]]
+  }
+}

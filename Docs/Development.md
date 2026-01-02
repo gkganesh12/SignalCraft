@@ -41,3 +41,9 @@
 - DB connection errors: verify `DATABASE_URL` and that Postgres is running.
 - Auth errors: confirm Clerk keys in `.env` and the frontend publishable key.
 - Redis errors: verify `REDIS_URL` and that Redis container is up.
+
+## Sentry webhook testing
+
+```bash
+WORKSPACE_ID=your_workspace_id scripts/send-sentry-webhook.sh
+```

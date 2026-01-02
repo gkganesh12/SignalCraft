@@ -11,6 +11,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
   app.use('/webhooks/clerk', express.raw({ type: '*/*' }));
+  app.use('/webhooks/sentry', express.raw({ type: '*/*' }));
 
   app.enableCors({
     origin: (origin, callback) => {

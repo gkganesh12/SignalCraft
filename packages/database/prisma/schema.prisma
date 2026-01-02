@@ -95,6 +95,7 @@ model Integration {
 model AlertEvent {
   id            String        @id @default(cuid())
   workspaceId   String
+  alertGroupId  String?
   source        String
   sourceEventId String
   project       String
@@ -111,9 +112,11 @@ model AlertEvent {
   updatedAt     DateTime      @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
+  alertGroup AlertGroup? @relation(fields: [alertGroupId], references: [id])
 
   @@unique([workspaceId, sourceEventId])
   @@index([workspaceId])
+  @@index([alertGroupId])
 }
 
 model AlertGroup {
