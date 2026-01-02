@@ -3,8 +3,8 @@ import { NormalizedAlert, AlertSeverity } from '@signalcraft/shared';
 
 @Injectable()
 export class NormalizationService {
-  normalizeSentry(payload: Record<string, any>): NormalizedAlert {
-    const event = payload.event ?? payload.data?.event ?? payload;
+  normalizeSentry(payload: Record<string, unknown>): NormalizedAlert {
+    const event = (payload.event ?? payload.data?.event ?? payload) as Record<string, unknown>;
 
     const sourceEventId =
       event.event_id ?? payload.event_id ?? payload.id ?? payload?.data?.event_id;
@@ -81,7 +81,7 @@ export class NormalizationService {
     return {};
   }
 
-  private findTag(event: Record<string, any>, key: string): string | null {
+  private findTag(event: Record<string, unknown>, key: string): string | null {
     const tags = event.tags;
     if (!Array.isArray(tags)) {
       return null;
@@ -91,7 +91,7 @@ export class NormalizationService {
   }
 
   private extractFingerprint(
-    event: Record<string, any>,
+    event: Record<string, unknown>,
     title: string,
     fallback: string,
   ): string {

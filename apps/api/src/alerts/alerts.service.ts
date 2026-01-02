@@ -41,7 +41,7 @@ export class AlertsService {
     return prisma.alertGroup.findMany({
       where: {
         workspaceId,
-        status: status ? (status.toUpperCase() as any) : undefined,
+        status: status ? (status.toUpperCase() as Prisma.AlertStatus) : undefined,
       },
       orderBy: { lastSeenAt: 'desc' },
     });

@@ -20,7 +20,7 @@ export class AlertProcessorService {
     payload,
   }: {
     workspaceId: string;
-    payload: Record<string, any>;
+    payload: Record<string, unknown>;
   }) {
     const normalized = this.normalizationService.normalizeSentry(payload);
 
