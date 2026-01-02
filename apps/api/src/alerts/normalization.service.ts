@@ -4,27 +4,48 @@ import { NormalizedAlert, AlertSeverity } from '@signalcraft/shared';
 @Injectable()
 export class NormalizationService {
   normalizeSentry(payload: Record<string, unknown>): NormalizedAlert {
-    const event = (payload.event ?? payload.data?.event ?? payload) as Record<string, unknown>;
+    const payloadRecord = this.asRecord(payload);
+    const payloadData = this.asRecord(payloadRecord.data);
+    const event = this.asRecord(payloadRecord.event ?? payloadData.event ?? payloadRecord);
 
     const sourceEventId =
-      event.event_id ?? payload.event_id ?? payload.id ?? payload?.data?.event_id;
+      this.getString(event.event_id) ??
+      this.getString(payloadRecord.event_id) ??
+      this.getString(payloadRecord.id) ??
+      this.getString(payloadData.event_id);
     if (!sourceEventId) {
       throw new Error('Missing Sentry event id');
     }
 
-    const project = payload.project_slug ?? payload.project ?? payload.project_name ?? 'unknown';
+    const project =
+      this.getString(payloadRecord.project_slug) ??
+      this.getString(payloadRecord.project) ??
+      this.getString(payloadRecord.project_name) ??
+      'unknown';
     const environment =
-      event.environment ?? payload.environment ?? this.findTag(event, 'environment') ?? 'unknown';
+      this.getString(event.environment) ??
+      this.getString(payloadRecord.environment) ??
+      this.findTag(event, 'environment') ??
+      'unknown';
 
-    const severity = this.mapSeverity(event.level ?? payload.level);
-    const title = event.title ?? payload.title ?? 'Sentry Issue';
-    const description = event.message ?? payload.message ?? event.culprit ?? '';
+    const severity = this.mapSeverity(
+      this.getString(event.level) ?? this.getString(payloadRecord.level),
+    );
+    const title =
+      this.getString(event.title) ?? this.getString(payloadRecord.title) ?? 'Sentry Issue';
+    const description =
+      this.getString(event.message) ??
+      this.getString(payloadRecord.message) ??
+      this.getString(event.culprit) ??
+      '';
 
-    const tags = this.normalizeTags(event.tags ?? payload.tags);
+    const tags = this.normalizeTags(event.tags ?? payloadRecord.tags);
     const fingerprint = this.extractFingerprint(event, title, sourceEventId);
 
-    const occurredAt = this.parseTimestamp(event.timestamp ?? payload.timestamp);
-    const link = payload.url ?? null;
+    const occurredAt = this.parseTimestamp(
+      this.getString(event.timestamp) ?? this.getString(payloadRecord.timestamp),
+    );
+    const link = this.getString(payloadRecord.url) ?? null;
 
     return {
       source: 'SENTRY',
@@ -87,7 +108,7 @@ export class NormalizationService {
       return null;
     }
     const match = tags.find((tag) => Array.isArray(tag) && tag[0] === key);
-    return match ? String(match[1]) : null;
+    return match && typeof match[1] !== 'undefined' ? String(match[1]) : null;
   }
 
   private extractFingerprint(
@@ -114,5 +135,16 @@ export class NormalizationService {
       return new Date();
     }
     return parsed;
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> {
+    if (value && typeof value === 'object') {
+      return value as Record<string, unknown>;
+    }
+    return {};
+  }
+
+  private getString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value : undefined;
   }
 }

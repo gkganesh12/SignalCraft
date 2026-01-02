@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { prisma, AlertSeverity, Prisma } from '@signalcraft/database';
+import { prisma, AlertSeverity, Prisma, AlertStatus } from '@signalcraft/database';
 import { NormalizedAlert } from '@signalcraft/shared';
 
 @Injectable()
@@ -41,7 +41,7 @@ export class AlertsService {
     return prisma.alertGroup.findMany({
       where: {
         workspaceId,
-        status: status ? (status.toUpperCase() as Prisma.AlertStatus) : undefined,
+        status: this.normalizeStatus(status),
       },
       orderBy: { lastSeenAt: 'desc' },
     });
@@ -55,7 +55,7 @@ export class AlertsService {
 
   async listEvents(workspaceId: string, groupId: string) {
     return prisma.alertEvent.findMany({
-      where: { workspaceId, alertGroupId: groupId } as Prisma.AlertEventWhereInput,
+      where: { workspaceId, alertGroupId: groupId },
       orderBy: { occurredAt: 'desc' },
     });
   }
@@ -79,5 +79,16 @@ export class AlertsService {
       default:
         return AlertSeverity.INFO;
     }
+  }
+
+  private normalizeStatus(status?: string): AlertStatus | undefined {
+    if (!status) {
+      return undefined;
+    }
+    const value = status.toUpperCase();
+    if (Object.values(AlertStatus).includes(value as AlertStatus)) {
+      return value as AlertStatus;
+    }
+    return undefined;
   }
 }
