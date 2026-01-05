@@ -207,6 +207,71 @@ export class AlertsService {
     });
   }
 
+  /**
+   * Acknowledge an alert group
+   */
+  async acknowledgeAlert(workspaceId: string, groupId: string, userId?: string) {
+    const alert = await prisma.alertGroup.findFirst({
+      where: { id: groupId, workspaceId },
+    });
+
+    if (!alert) {
+      return null;
+    }
+
+    return prisma.alertGroup.update({
+      where: { id: groupId },
+      data: {
+        status: AlertStatus.ACK,
+        assigneeUserId: userId ?? alert.assigneeUserId,
+      },
+    });
+  }
+
+  /**
+   * Resolve an alert group
+   */
+  async resolveAlert(workspaceId: string, groupId: string) {
+    const alert = await prisma.alertGroup.findFirst({
+      where: { id: groupId, workspaceId },
+    });
+
+    if (!alert) {
+      return null;
+    }
+
+    return prisma.alertGroup.update({
+      where: { id: groupId },
+      data: {
+        status: AlertStatus.RESOLVED,
+        resolvedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Snooze an alert group for a duration
+   */
+  async snoozeAlert(workspaceId: string, groupId: string, durationMinutes = 60) {
+    const alert = await prisma.alertGroup.findFirst({
+      where: { id: groupId, workspaceId },
+    });
+
+    if (!alert) {
+      return null;
+    }
+
+    const snoozeUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
+
+    return prisma.alertGroup.update({
+      where: { id: groupId },
+      data: {
+        status: AlertStatus.SNOOZED,
+        snoozeUntil,
+      },
+    });
+  }
+
   async getWorkspaceIdByClerkId(clerkId: string) {
     const user = await prisma.user.findUnique({ where: { clerkId } });
     return user?.workspaceId ?? null;

@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Param, Query, UseGuards, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards, NotFoundException, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { AlertsService, AlertGroupFilters, PaginationOptions, SortOptions } from './alerts.service';
 import { ClerkAuthGuard } from '../auth/clerk-auth.guard';
@@ -89,5 +89,42 @@ export class AlertsController {
   ) {
     return this.alertsService.listEvents(workspaceId, groupId);
   }
-}
 
+  @Post(':id/acknowledge')
+  async acknowledgeAlert(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') groupId: string,
+  ) {
+    const result = await this.alertsService.acknowledgeAlert(workspaceId, groupId);
+    if (!result) {
+      throw new NotFoundException('Alert group not found');
+    }
+    return result;
+  }
+
+  @Post(':id/resolve')
+  async resolveAlert(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') groupId: string,
+  ) {
+    const result = await this.alertsService.resolveAlert(workspaceId, groupId);
+    if (!result) {
+      throw new NotFoundException('Alert group not found');
+    }
+    return result;
+  }
+
+  @Post(':id/snooze')
+  async snoozeAlert(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') groupId: string,
+    @Query('duration') duration?: string,
+  ) {
+    const durationMinutes = duration ? parseInt(duration, 10) : 60;
+    const result = await this.alertsService.snoozeAlert(workspaceId, groupId, durationMinutes);
+    if (!result) {
+      throw new NotFoundException('Alert group not found');
+    }
+    return result;
+  }
+}
