@@ -127,6 +127,7 @@ model AlertGroup {
   title          String
   severity       AlertSeverity
   environment    String
+  project        String      @default("default")  // Phase 5: Project for filtering
   status         AlertStatus @default(OPEN)
   assigneeUserId String?
   firstSeenAt    DateTime

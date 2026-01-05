@@ -16,6 +16,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RoutingModule } from './routing/routing.module';
 import { EscalationsModule } from './escalations/escalations.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { EscalationsModule } from './escalations/escalations.module';
     NotificationsModule,
     RoutingModule,
     EscalationsModule,
+    DashboardModule,
   ],
   providers: [
     {
