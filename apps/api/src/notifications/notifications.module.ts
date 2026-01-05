@@ -9,6 +9,6 @@ import { NotificationsController } from './notifications.controller';
   imports: [IntegrationsModule],
   controllers: [NotificationsController],
   providers: [NotificationLogService, SlackNotificationService, NotificationProcessor],
-  exports: [SlackNotificationService],
+  exports: [SlackNotificationService, NotificationLogService],
 })
-export class NotificationsModule {}
+export class NotificationsModule { }
