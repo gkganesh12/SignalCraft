@@ -61,32 +61,37 @@ export class DashboardService {
      * Get complete dashboard overview metrics
      */
     async getOverviewMetrics(workspaceId: string): Promise<DashboardOverview> {
-        const now = new Date();
-        const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const prev24h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+        try {
+            const now = new Date();
+            const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const prev24h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
-        const [
-            alerts24h,
-            deduplicationRatio,
-            acknowledgmentRate,
-            topNoisySources,
-            integrationHealth,
-        ] = await Promise.all([
-            this.getAlerts24h(workspaceId, now, last24h, prev24h),
-            this.getDeduplicationRatio(workspaceId, now, last24h, prev24h),
-            this.getAcknowledgmentRate(workspaceId, now, last24h, prev24h),
-            this.getTopNoisySources(workspaceId, last24h),
-            this.getIntegrationHealth(workspaceId),
-        ]);
+            const [
+                alerts24h,
+                deduplicationRatio,
+                acknowledgmentRate,
+                topNoisySources,
+                integrationHealth,
+            ] = await Promise.all([
+                this.getAlerts24h(workspaceId, now, last24h, prev24h),
+                this.getDeduplicationRatio(workspaceId, now, last24h, prev24h),
+                this.getAcknowledgmentRate(workspaceId, now, last24h, prev24h),
+                this.getTopNoisySources(workspaceId, last24h),
+                this.getIntegrationHealth(workspaceId),
+            ]);
 
-        return {
-            alerts24h,
-            deduplicationRatio,
-            acknowledgmentRate,
-            topNoisySources,
-            integrationHealth,
-            generatedAt: now,
-        };
+            return {
+                alerts24h,
+                deduplicationRatio,
+                acknowledgmentRate,
+                topNoisySources,
+                integrationHealth,
+                generatedAt: now,
+            };
+        } catch (error) {
+            this.logger.error(`Failed to get overview metrics for workspace ${workspaceId}`, error);
+            throw error;
+        }
     }
 
     /**
@@ -219,28 +224,38 @@ export class DashboardService {
     /**
      * Get top noisy sources (projects with most alerts)
      */
+    /**
+     * Get top noisy sources (projects with most alerts)
+     */
     private async getTopNoisySources(
         workspaceId: string,
         since: Date,
     ): Promise<TopSource[]> {
-        // Use raw query for proper groupBy since Prisma groupBy has limitations
-        const results = await prisma.$queryRaw<Array<{ project: string; environment: string; count: bigint }>>`
-      SELECT project, environment, COUNT(*) as count
-      FROM "AlertGroup"
-      WHERE "workspaceId" = ${workspaceId}
-        AND "createdAt" >= ${since}
-      GROUP BY project, environment
-      ORDER BY count DESC
-      LIMIT 10
-    `;
+        const results = await prisma.alertGroup.groupBy({
+            by: ['project', 'environment'],
+            where: {
+                workspaceId,
+                createdAt: { gte: since },
+            },
+            _count: {
+                _all: true,
+            },
+            orderBy: {
+                _count: {
+                    project: 'desc', // Orders by count
+                },
+            },
+            take: 10,
+        });
 
-        const total = results.reduce((sum, r) => sum + Number(r.count), 0);
+        // Calculate total for percentage
+        const total = results.reduce((sum, r) => sum + r._count._all, 0);
 
         return results.map((r) => ({
             project: r.project,
             environment: r.environment,
-            count: Number(r.count),
-            percentage: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
+            count: r._count._all,
+            percentage: total > 0 ? Math.round((r._count._all / total) * 100) : 0,
         }));
     }
 
@@ -378,5 +393,128 @@ export class DashboardService {
             default:
                 return type;
         }
+    }
+
+    /**
+     * Get detailed analytics for the analytics page
+     */
+    async getAnalytics(workspaceId: string, range: string) {
+        const now = new Date();
+        let hours: number;
+
+        switch (range) {
+            case '24h':
+                hours = 24;
+                break;
+            case '30d':
+                hours = 30 * 24;
+                break;
+            case '7d':
+            default:
+                hours = 7 * 24;
+        }
+
+        const since = new Date(now.getTime() - hours * 60 * 60 * 1000);
+
+        // Get all alerts in the time range
+        const alertGroups = await prisma.alertGroup.findMany({
+            where: {
+                workspaceId,
+                createdAt: { gte: since },
+            },
+            select: {
+                id: true,
+                severity: true,
+                project: true,
+                environment: true,
+                status: true,
+                createdAt: true,
+                resolvedAt: true,
+            },
+        });
+
+        // Alerts over time - group by day or hour depending on range
+        const alertsOverTime: { date: string; count: number }[] = [];
+        const bucketCount = range === '24h' ? 24 : range === '7d' ? 7 : 30;
+        const bucketSize = hours / bucketCount;
+
+        for (let i = bucketCount - 1; i >= 0; i--) {
+            const bucketStart = new Date(now.getTime() - (i + 1) * bucketSize * 60 * 60 * 1000);
+            const bucketEnd = new Date(now.getTime() - i * bucketSize * 60 * 60 * 1000);
+
+            const count = alertGroups.filter(ag =>
+                ag.createdAt >= bucketStart && ag.createdAt < bucketEnd
+            ).length;
+
+            alertsOverTime.push({
+                date: range === '24h'
+                    ? bucketEnd.toLocaleTimeString('en-US', { hour: 'numeric' })
+                    : bucketEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                count,
+            });
+        }
+
+        // Alerts by severity
+        const severityCounts = new Map<string, number>();
+        alertGroups.forEach(ag => {
+            severityCounts.set(ag.severity, (severityCounts.get(ag.severity) || 0) + 1);
+        });
+        const alertsBySeverity = Array.from(severityCounts.entries())
+            .map(([severity, count]) => ({ severity, count }))
+            .sort((a, b) => {
+                const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
+                return order.indexOf(a.severity) - order.indexOf(b.severity);
+            });
+
+        // Alerts by project
+        const projectCounts = new Map<string, number>();
+        alertGroups.forEach(ag => {
+            projectCounts.set(ag.project, (projectCounts.get(ag.project) || 0) + 1);
+        });
+        const alertsByProject = Array.from(projectCounts.entries())
+            .map(([project, count]) => ({ project, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        // Alerts by environment
+        const envCounts = new Map<string, number>();
+        alertGroups.forEach(ag => {
+            envCounts.set(ag.environment, (envCounts.get(ag.environment) || 0) + 1);
+        });
+        const alertsByEnvironment = Array.from(envCounts.entries())
+            .map(([environment, count]) => ({ environment, count }))
+            .sort((a, b) => b.count - a.count);
+
+        // Summary metrics
+        const totalAlerts = alertGroups.length;
+        const resolvedAlerts = alertGroups.filter(ag => ag.status === 'RESOLVED').length;
+        const openAlerts = alertGroups.filter(ag => ag.status === 'OPEN').length;
+        const resolutionRate = totalAlerts > 0
+            ? Math.round((resolvedAlerts / totalAlerts) * 1000) / 10
+            : 0;
+
+        // Calculate MTTR (Mean Time To Resolution) in minutes
+        const resolvedWithTime = alertGroups.filter(ag => ag.status === 'RESOLVED' && ag.resolvedAt);
+        let mttr = 0;
+        if (resolvedWithTime.length > 0) {
+            const totalResolutionTime = resolvedWithTime.reduce((sum, ag) => {
+                const resolutionTime = (ag.resolvedAt!.getTime() - ag.createdAt.getTime()) / (1000 * 60);
+                return sum + resolutionTime;
+            }, 0);
+            mttr = Math.round(totalResolutionTime / resolvedWithTime.length);
+        }
+
+        return {
+            alertsOverTime,
+            alertsBySeverity,
+            alertsByProject,
+            alertsByEnvironment,
+            totalAlerts,
+            resolvedAlerts,
+            openAlerts,
+            mttr,
+            resolutionRate,
+            resolvedAverageTime: mttr,
+        };
     }
 }
