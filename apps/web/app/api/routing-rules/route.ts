@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:5050';
 
 export async function GET(_req: NextRequest) {
     const { getToken } = auth();
@@ -16,7 +16,14 @@ export async function GET(_req: NextRequest) {
     });
 
     if (!response.ok) {
-        return NextResponse.json({ rules: [], total: 0 }, { status: 500 });
+        const errorText = await response.text();
+        console.error('Backend Routing Rules Error:', response.status, errorText);
+        try {
+            const errorJson = JSON.parse(errorText);
+            return NextResponse.json(errorJson, { status: response.status });
+        } catch {
+            return NextResponse.json({ error: errorText || response.statusText }, { status: response.status });
+        }
     }
 
     const data = await response.json();

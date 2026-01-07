@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json([], { status: 401 });
   }
 
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5050';
   const response = await fetch(`${apiBase}/integrations/slack/channels`, {
     headers: { Authorization: `Bearer ${token}` },
   });

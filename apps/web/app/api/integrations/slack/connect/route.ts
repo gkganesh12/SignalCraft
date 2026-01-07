@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/login', req.url));
   }
 
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5050';
   const workspaceResponse = await fetch(`${apiBase}/auth/workspace`, {
     headers: { Authorization: `Bearer ${token}` },
   });
