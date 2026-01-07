@@ -22,41 +22,43 @@ export function AlertsTrendChart({ data }: AlertsTrendChartProps) {
   }));
 
   return (
-    <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200/50 p-6 shadow-sm">
-      <h3 className="text-sm font-medium text-gray-500 mb-4">Alerts Trend (24h)</h3>
+    <div className="rounded-xl bg-zinc-950 border border-red-900/10 p-6 shadow-sm">
+      <h3 className="text-sm font-medium text-zinc-400 mb-4">Alerts Trend (24h)</h3>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={formattedData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: '#71717a' }}
               tickLine={false}
-              axisLine={{ stroke: '#e5e7eb' }}
+              axisLine={{ stroke: '#27272a' }}
               interval="preserveStartEnd"
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#6b7280' }}
+              tick={{ fontSize: 11, fill: '#71717a' }}
               tickLine={false}
-              axisLine={{ stroke: '#e5e7eb' }}
+              axisLine={{ stroke: '#27272a' }}
               width={40}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#fff',
-                border: '1px solid #e5e7eb',
+                backgroundColor: '#09090b',
+                border: '1px solid #27272a',
                 borderRadius: '8px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)',
+                color: '#fff'
               }}
-              labelStyle={{ color: '#374151', fontWeight: 600 }}
+              labelStyle={{ color: '#a1a1aa', fontWeight: 600 }}
+              itemStyle={{ color: '#fff' }}
             />
             <Line
               type="monotone"
               dataKey="count"
-              stroke="#3b82f6"
+              stroke="#dc2626"
               strokeWidth={2}
-              dot={{ fill: '#3b82f6', r: 3 }}
-              activeDot={{ r: 5, fill: '#2563eb' }}
+              dot={{ fill: '#dc2626', r: 3, strokeWidth: 0 }}
+              activeDot={{ r: 5, fill: '#ef4444', stroke: '#7f1d1d', strokeWidth: 2 }}
             />
           </LineChart>
         </ResponsiveContainer>

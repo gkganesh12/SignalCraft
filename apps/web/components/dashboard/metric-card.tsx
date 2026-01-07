@@ -35,19 +35,22 @@ export function MetricCard({
   return (
     <div
       className={cn(
-        'rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200/50 p-6 shadow-sm hover:shadow-md transition-shadow',
+        'relative overflow-hidden rounded-xl bg-zinc-950 border border-red-900/10 p-6 shadow-sm hover:shadow-[0_0_20px_rgba(220,38,38,0.1)] hover:border-red-500/30 transition-all duration-300',
         className
       )}
     >
-      <div className="flex items-start justify-between">
+      <div className="absolute inset-0 overflow-hidden rounded-xl">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-red-500/10 to-transparent -translate-x-full animate-scan" />
+      </div>
+      <div className="relative flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <p className="text-sm font-medium text-zinc-400">{title}</p>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-gray-900">{value}</span>
-            {suffix && <span className="text-sm text-gray-500">{suffix}</span>}
+            <span className="text-3xl font-bold text-white">{value}</span>
+            {suffix && <span className="text-sm text-zinc-500">{suffix}</span>}
           </div>
           {description && (
-            <p className="mt-1 text-xs text-gray-400">{description}</p>
+            <p className="mt-1 text-xs text-zinc-500">{description}</p>
           )}
         </div>
         

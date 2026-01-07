@@ -15,10 +15,10 @@ interface IntegrationHealthListProps {
 }
 
 const statusColors = {
-  healthy: 'bg-emerald-100 text-emerald-700',
-  warning: 'bg-yellow-100 text-yellow-700',
-  error: 'bg-red-100 text-red-700',
-  disconnected: 'bg-gray-100 text-gray-500',
+  healthy: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  warning: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  error: 'bg-red-500/10 text-red-400 border-red-500/20',
+  disconnected: 'bg-zinc-800 text-zinc-400 border-zinc-700',
 };
 
 const statusLabels = {
@@ -45,30 +45,30 @@ export function IntegrationHealthList({ integrations }: IntegrationHealthListPro
   };
 
   return (
-    <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200/50 p-6 shadow-sm">
-      <h3 className="text-sm font-medium text-gray-500 mb-4">Integration Health</h3>
+    <div className="rounded-xl bg-zinc-950 border border-red-900/10 p-6 shadow-sm">
+      <h3 className="text-sm font-medium text-zinc-400 mb-4">Integration Health</h3>
       <div className="space-y-3">
         {integrations.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">No integrations configured</p>
+          <p className="text-sm text-zinc-500 text-center py-4">No integrations configured</p>
         ) : (
           integrations.map((integration) => (
             <div
               key={integration.id}
-              className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
+              className="flex items-center justify-between p-3 rounded-lg bg-zinc-900/30 border border-zinc-800/50 hover:border-zinc-800 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center text-lg">
+                <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-lg border border-zinc-800">
                   {integration.type === 'SLACK' ? '💬' : '🐛'}
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{integration.name}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="font-medium text-zinc-200">{integration.name}</p>
+                  <p className="text-xs text-zinc-500">
                     {formatLastActivity(integration.lastActivity)}
                   </p>
                 </div>
               </div>
               <span
-                className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[integration.status]}`}
+                className={`px-2 py-1 rounded-full text-xs font-medium border ${statusColors[integration.status]}`}
               >
                 {statusLabels[integration.status]}
               </span>
