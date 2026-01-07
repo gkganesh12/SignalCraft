@@ -157,12 +157,13 @@ export class HygieneService {
     }
 
     /**
-     * Manually resolve an alert group
+     * Manually resolve an alert group with optional resolution notes
      */
     async resolveAlertGroup(
         workspaceId: string,
         alertGroupId: string,
         resolvedBy?: string,
+        resolutionNotes?: string,
     ) {
         const group = await prisma.alertGroup.findFirst({
             where: { id: alertGroupId, workspaceId },
@@ -181,13 +182,28 @@ export class HygieneService {
             };
         }
 
+        // Calculate resolution time in minutes
+        const resolvedAt = new Date();
+        const resolutionMinutes = Math.round(
+            (resolvedAt.getTime() - group.lastSeenAt.getTime()) / (1000 * 60)
+        );
+
+        // Calculate rolling average resolution time
+        const newAvgResolution = group.avgResolutionMins
+            ? Math.round((group.avgResolutionMins + resolutionMinutes) / 2)
+            : resolutionMinutes;
+
         const updated = await prisma.alertGroup.update({
             where: { id: alertGroupId },
             data: {
                 status: AlertStatus.RESOLVED,
-                resolvedAt: new Date(),
+                resolvedAt,
                 snoozeUntil: null,
                 assigneeUserId: resolvedBy || group.assigneeUserId,
+                // Resolution Memory fields
+                resolutionNotes: resolutionNotes || group.resolutionNotes,
+                lastResolvedBy: resolvedBy || group.lastResolvedBy,
+                avgResolutionMins: newAvgResolution,
             },
         });
 
@@ -197,12 +213,16 @@ export class HygieneService {
         this.logger.log(`Alert group resolved`, {
             alertGroupId,
             resolvedBy,
+            resolutionMinutes,
+            hasNotes: !!resolutionNotes,
         });
 
         return {
             id: updated.id,
             status: updated.status,
             resolvedAt: updated.resolvedAt,
+            resolutionNotes: updated.resolutionNotes,
+            avgResolutionMins: updated.avgResolutionMins,
         };
     }
 

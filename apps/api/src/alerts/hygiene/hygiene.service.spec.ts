@@ -101,6 +101,10 @@ describe('HygieneService', () => {
                 id: 'group-1',
                 workspaceId: 'ws-1',
                 status: AlertStatus.OPEN,
+                lastSeenAt: new Date(Date.now() - 60000), // 1 minute ago
+                avgResolutionMins: null,
+                resolutionNotes: null,
+                lastResolvedBy: null,
             };
 
             (prisma.alertGroup.findFirst as jest.Mock).mockResolvedValue(mockGroup);
@@ -108,6 +112,8 @@ describe('HygieneService', () => {
                 ...mockGroup,
                 status: AlertStatus.RESOLVED,
                 resolvedAt: new Date(),
+                resolutionNotes: null,
+                avgResolutionMins: 1,
             });
 
             const result = await service.resolveAlertGroup('ws-1', 'group-1', 'user-1');

@@ -15,11 +15,13 @@ import {
     UseGuards,
     Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ClerkAuthGuard } from '../../auth/clerk-auth.guard';
-import { HygieneService, SnoozeOptions } from './hygiene.service';
+import { WorkspaceId } from '../../common/decorators/workspace-id.decorator';
+import { HygieneService } from './hygiene.service';
 
 @ApiTags('alert-hygiene')
+@ApiBearerAuth()
 @Controller('api/alert-groups')
 @UseGuards(ClerkAuthGuard)
 export class HygieneController {
@@ -33,11 +35,10 @@ export class HygieneController {
     @ApiResponse({ status: 404, description: 'Alert not found' })
     @ApiResponse({ status: 400, description: 'Cannot snooze resolved alert' })
     async snoozeAlert(
+        @WorkspaceId() workspaceId: string,
         @Param('id') alertGroupId: string,
         @Body() body: { durationHours?: number },
     ) {
-        const workspaceId = 'demo-workspace'; // TODO: Extract from auth context
-
         return this.hygieneService.snoozeAlertGroup(workspaceId, alertGroupId, {
             durationHours: body.durationHours ?? 1,
         });
@@ -48,9 +49,10 @@ export class HygieneController {
     @ApiResponse({ status: 200, description: 'Alert unsnoozed successfully' })
     @ApiResponse({ status: 404, description: 'Alert not found' })
     @ApiResponse({ status: 400, description: 'Alert is not snoozed' })
-    async unsnoozeAlert(@Param('id') alertGroupId: string) {
-        const workspaceId = 'demo-workspace'; // TODO: Extract from auth context
-
+    async unsnoozeAlert(
+        @WorkspaceId() workspaceId: string,
+        @Param('id') alertGroupId: string,
+    ) {
         return this.hygieneService.unsnoozeAlertGroup(workspaceId, alertGroupId);
     }
 
@@ -58,9 +60,10 @@ export class HygieneController {
     @ApiOperation({ summary: 'Manually resolve an alert group' })
     @ApiResponse({ status: 200, description: 'Alert resolved successfully' })
     @ApiResponse({ status: 404, description: 'Alert not found' })
-    async resolveAlert(@Param('id') alertGroupId: string) {
-        const workspaceId = 'demo-workspace'; // TODO: Extract from auth context
-
+    async resolveAlert(
+        @WorkspaceId() workspaceId: string,
+        @Param('id') alertGroupId: string,
+    ) {
         return this.hygieneService.resolveAlertGroup(workspaceId, alertGroupId);
     }
 
@@ -69,18 +72,17 @@ export class HygieneController {
     @ApiResponse({ status: 200, description: 'Alert acknowledged successfully' })
     @ApiResponse({ status: 404, description: 'Alert not found' })
     @ApiResponse({ status: 400, description: 'Cannot acknowledge resolved alert' })
-    async acknowledgeAlert(@Param('id') alertGroupId: string) {
-        const workspaceId = 'demo-workspace'; // TODO: Extract from auth context
-
+    async acknowledgeAlert(
+        @WorkspaceId() workspaceId: string,
+        @Param('id') alertGroupId: string,
+    ) {
         return this.hygieneService.acknowledgeAlertGroup(workspaceId, alertGroupId);
     }
 
     @Get('hygiene/stats')
     @ApiOperation({ summary: 'Get hygiene statistics for the workspace' })
     @ApiResponse({ status: 200, description: 'Hygiene statistics' })
-    async getHygieneStats() {
-        const workspaceId = 'demo-workspace'; // TODO: Extract from auth context
-
+    async getHygieneStats(@WorkspaceId() workspaceId: string) {
         return this.hygieneService.getHygieneStats(workspaceId);
     }
 
@@ -90,11 +92,10 @@ export class HygieneController {
     @ApiQuery({ name: 'dryRun', required: false, type: Boolean })
     @ApiResponse({ status: 200, description: 'Auto-close result' })
     async autoCloseStaleAlerts(
+        @WorkspaceId() workspaceId: string,
         @Query('inactivityDays') inactivityDays?: string,
         @Query('dryRun') dryRun?: string,
     ) {
-        const workspaceId = 'demo-workspace'; // TODO: Extract from auth context
-
         return this.hygieneService.autoCloseStaleAlerts({
             workspaceId,
             inactivityDays: inactivityDays ? parseInt(inactivityDays, 10) : 7,
@@ -105,9 +106,7 @@ export class HygieneController {
     @Post('hygiene/process-expired-snoozes')
     @ApiOperation({ summary: 'Process all expired snoozes' })
     @ApiResponse({ status: 200, description: 'Number of snoozes processed' })
-    async processExpiredSnoozes() {
-        const workspaceId = 'demo-workspace'; // TODO: Extract from auth context
-
+    async processExpiredSnoozes(@WorkspaceId() workspaceId: string) {
         const count = await this.hygieneService.processExpiredSnoozes(workspaceId);
         return { processedCount: count };
     }

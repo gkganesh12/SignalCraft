@@ -1,6 +1,8 @@
 import { BadRequestException, Controller, Get, Param, Query, UseGuards, NotFoundException, Post, Patch, Body } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { AlertsService, AlertGroupFilters, PaginationOptions, SortOptions } from './alerts.service';
+import { CorrelationService } from './correlation.service';
+import { PostmortemService } from './postmortem.service';
 import { ClerkAuthGuard } from '../auth/clerk-auth.guard';
 import { WorkspaceId } from '../common/decorators/workspace-id.decorator';
 import { AlertStatus, AlertSeverity } from '@signalcraft/database';
@@ -10,7 +12,43 @@ import { AlertStatus, AlertSeverity } from '@signalcraft/database';
 @UseGuards(ClerkAuthGuard)
 @Controller('api/alert-groups')
 export class AlertsController {
-  constructor(private readonly alertsService: AlertsService) { }
+  constructor(
+    private readonly alertsService: AlertsService,
+    private readonly correlationService: CorrelationService,
+    private readonly postmortemService: PostmortemService,
+  ) { }
+
+  // ... existing code ...
+
+  @Post(':id/postmortem')
+  async generatePostmortem(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') groupId: string,
+  ) {
+    const report = await this.postmortemService.generatePostmortem(workspaceId, groupId);
+    return { report };
+  }
+
+  @Get(':id/related')
+  async getRelatedAlerts(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') groupId: string,
+  ) {
+    return this.correlationService.getCorrelatedAlerts(workspaceId, groupId);
+  }
+
+  @Post('analyze-correlations')
+  async triggerCorrelationAnalysis(@WorkspaceId() workspaceId: string) {
+    // Fire and forget for now, or await if fast enough. 
+    // For large datasets, this should be a job.
+    this.correlationService.analyzeCorrelations(workspaceId);
+    return { message: 'Correlation analysis queued' };
+  }
+
+  @Get('anomalies')
+  async getAnomalies(@WorkspaceId() workspaceId: string) {
+    return this.alertsService.getAnomalies(workspaceId);
+  }
 
   @Get()
   @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by status (comma-separated)' })
@@ -90,6 +128,26 @@ export class AlertsController {
     return this.alertsService.listEvents(workspaceId, groupId);
   }
 
+  @Get(':id/breadcrumbs')
+  async getBreadcrumbs(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') groupId: string,
+  ) {
+    return this.alertsService.getBreadcrumbs(workspaceId, groupId);
+  }
+
+  @Get(':id/ai-suggestion')
+  async getAiSuggestion(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') groupId: string,
+  ) {
+    const result = await this.alertsService.getAiSuggestion(workspaceId, groupId);
+    if (!result) {
+      throw new NotFoundException('Alert group not found');
+    }
+    return result;
+  }
+
   @Post(':id/acknowledge')
   async acknowledgeAlert(
     @WorkspaceId() workspaceId: string,
@@ -106,8 +164,14 @@ export class AlertsController {
   async resolveAlert(
     @WorkspaceId() workspaceId: string,
     @Param('id') groupId: string,
+    @Body() body: { resolutionNotes?: string; resolvedBy?: string },
   ) {
-    const result = await this.alertsService.resolveAlert(workspaceId, groupId);
+    const result = await this.alertsService.resolveAlert(
+      workspaceId,
+      groupId,
+      body.resolutionNotes,
+      body.resolvedBy,
+    );
     if (!result) {
       throw new NotFoundException('Alert group not found');
     }
