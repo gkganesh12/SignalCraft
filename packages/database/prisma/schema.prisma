@@ -70,6 +70,28 @@ model Workspace {
   uptimeChecks     UptimeCheck[]
   apiKeys          ApiKey[]
   emailIntegration EmailIntegration?
+  auditLogs        AuditLog[]
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  userId       String
+  action       String // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.
+  resourceType String // AlertGroup, RoutingRule, User, etc.
+  resourceId   String? // ID of the affected resource
+  metadata     Json? // Additional context (old/new values, etc.)
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([workspaceId, createdAt])
+  @@index([resourceType, resourceId])
 }
 
 model ApiKey {
@@ -156,6 +178,7 @@ model User {
   workspace           Workspace    @relation(fields: [workspaceId], references: [id])
   assignedAlertGroups AlertGroup[] @relation("AlertGroupAssignee")
   apiKeys             ApiKey[]
+  auditLogs           AuditLog[]
 
   @@index([workspaceId])
 }

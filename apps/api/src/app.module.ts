@@ -23,6 +23,7 @@ import { ReleasesModule } from './releases/releases.module';
 import { UptimeModule } from './uptime/uptime.module';
 import { SessionReplayModule } from './session-replay/session-replay.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
+import { AuditModule } from './audit/audit.module';
 
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -78,6 +79,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     UptimeModule,
     SessionReplayModule,
     ApiKeysModule,
+    AuditModule,
   ],
   providers: [
     {
