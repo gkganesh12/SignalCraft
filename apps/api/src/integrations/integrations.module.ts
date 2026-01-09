@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
+import { IntegrationsService } from './integrations.service';
 import { IntegrationsController } from './integrations.controller';
-import { EncryptionService } from './encryption.service';
-import { SlackOAuthService } from './slack/oauth.service';
-import { SlackService } from './slack/slack.service';
+import { SlackController } from './slack.controller';
+import { PagerDutyService } from './pagerduty.service';
+import { PagerDutyController } from './pagerduty.controller';
 
 @Module({
-  controllers: [IntegrationsController],
-  providers: [EncryptionService, SlackOAuthService, SlackService],
-  exports: [SlackOAuthService, SlackService],
+  controllers: [IntegrationsController, SlackController, PagerDutyController],
+  providers: [IntegrationsService, PagerDutyService],
+  exports: [IntegrationsService, PagerDutyService],
 })
-export class IntegrationsModule {}
+export class IntegrationsModule { }
