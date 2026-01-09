@@ -39,6 +39,12 @@ const settingsSections = [
     href: '/dashboard/settings/api-keys',
     icon: Key,
   },
+  {
+    title: 'Team',
+    description: 'Manage team members and their roles',
+    href: '/dashboard/settings/team',
+    icon: Users,
+  },
 ];
 
 export default function SettingsPage() {
