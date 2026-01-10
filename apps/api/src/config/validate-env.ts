@@ -8,6 +8,8 @@ const envSchema = z.object({
   CLERK_JWT_PUBLIC_KEY: z.string().optional(),
   CLERK_ISSUER: z.string().min(1),
   CLERK_WEBHOOK_SECRET: z.string().optional(),
+  SENTRY_WEBHOOK_SECRET: z.string().optional(),
+  GROUPING_WINDOW_MINUTES: z.coerce.number().optional(),
   CORS_ORIGINS: z.string().optional(),
   REDIS_URL: z.string().optional(),
 });
