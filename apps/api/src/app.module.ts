@@ -13,6 +13,7 @@ import { QueueModule } from './queues/queue.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { AlertsModule } from './alerts/alerts.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     WebhooksModule,
     AlertsModule,
     IntegrationsModule,
+    NotificationsModule,
   ],
   providers: [
     {

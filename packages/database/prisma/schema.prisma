@@ -90,6 +90,7 @@ model Integration {
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@index([workspaceId])
+  @@unique([workspaceId, type])
 }
 
 model AlertEvent {

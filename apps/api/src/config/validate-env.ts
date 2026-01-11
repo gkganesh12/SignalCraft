@@ -10,6 +10,12 @@ const envSchema = z.object({
   CLERK_WEBHOOK_SECRET: z.string().optional(),
   SENTRY_WEBHOOK_SECRET: z.string().optional(),
   GROUPING_WINDOW_MINUTES: z.coerce.number().optional(),
+  SLACK_CLIENT_ID: z.string().optional(),
+  SLACK_CLIENT_SECRET: z.string().optional(),
+  SLACK_REDIRECT_URI: z.string().optional(),
+  SLACK_SIGNING_SECRET: z.string().optional(),
+  SLACK_DEFAULT_CHANNEL: z.string().optional(),
+  ENCRYPTION_KEY: z.string().optional(),
   CORS_ORIGINS: z.string().optional(),
   REDIS_URL: z.string().optional(),
 });

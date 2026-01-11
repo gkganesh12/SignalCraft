@@ -1,0 +1,18 @@
+{
+  "type": "block_actions",
+  "user": {
+    "id": "U123456"
+  },
+  "channel": {
+    "id": "C123456"
+  },
+  "message": {
+    "ts": "1700000000.000100"
+  },
+  "actions": [
+    {
+      "action_id": "ack",
+      "value": "alert_group_id"
+    }
+  ]
+}
