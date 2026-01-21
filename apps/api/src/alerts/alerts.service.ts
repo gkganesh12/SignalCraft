@@ -272,6 +272,27 @@ export class AlertsService {
     });
   }
 
+  /**
+   * Update alert group (assignee, runbook, notes)
+   */
+  async updateAlertGroup(workspaceId: string, groupId: string, data: { assigneeUserId?: string | null; runbookUrl?: string | null }) {
+    const alert = await prisma.alertGroup.findFirst({
+      where: { id: groupId, workspaceId },
+    });
+
+    if (!alert) {
+      return null;
+    }
+
+    return prisma.alertGroup.update({
+      where: { id: groupId },
+      data: {
+        ...(data.assigneeUserId !== undefined && { assigneeUserId: data.assigneeUserId }),
+        ...(data.runbookUrl !== undefined && { runbookUrl: data.runbookUrl }),
+      },
+    });
+  }
+
   async getWorkspaceIdByClerkId(clerkId: string) {
     const user = await prisma.user.findUnique({ where: { clerkId } });
     return user?.workspaceId ?? null;

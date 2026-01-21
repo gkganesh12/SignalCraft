@@ -1,10 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
-export async function GET(
-    _req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_req: NextRequest) {
     const { getToken } = await auth();
     const token = await getToken();
 
@@ -12,11 +9,10 @@ export async function GET(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await params;
     const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5050';
 
     try {
-        const res = await fetch(`${apiUrl}/api/alert-groups/${id}`, {
+        const res = await fetch(`${apiUrl}/api/settings/notifications`, {
             headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -31,15 +27,12 @@ export async function GET(
         const data = await res.json();
         return NextResponse.json(data);
     } catch (err) {
-        console.error('Alert group detail API error:', err);
-        return NextResponse.json({ error: 'Failed to fetch alert group' }, { status: 500 });
+        console.error('Notification settings API error:', err);
+        return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
     }
 }
 
-export async function PATCH(
-    req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(req: NextRequest) {
     const { getToken } = await auth();
     const token = await getToken();
 
@@ -47,13 +40,12 @@ export async function PATCH(
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = await params;
     const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5050';
     const body = await req.json();
 
     try {
-        const res = await fetch(`${apiUrl}/api/alert-groups/${id}`, {
-            method: 'PATCH',
+        const res = await fetch(`${apiUrl}/api/settings/notifications`, {
+            method: 'PUT',
             headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -69,7 +61,7 @@ export async function PATCH(
         const data = await res.json();
         return NextResponse.json(data);
     } catch (err) {
-        console.error('Update alert group API error:', err);
-        return NextResponse.json({ error: 'Failed to update alert group' }, { status: 500 });
+        console.error('Update notifications API error:', err);
+        return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
     }
 }

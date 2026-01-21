@@ -1,41 +1,44 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { HealthService } from './health.service';
 
 @ApiTags('health')
-@Controller()
+@Controller('health')
 export class HealthController {
-  constructor(private readonly healthService: HealthService) {}
+  constructor(
+    private health: HealthCheckService,
+    private healthService: HealthService,
+  ) { }
 
-  @Get('health')
-  async health() {
-    const [db, redis] = await Promise.all([
-      this.healthService.checkDatabase(),
-      this.healthService.checkRedis(),
+  @Get()
+  @HealthCheck()
+  check() {
+    return this.health.check([
+      // Database check
+      async () => {
+        const isUp = await this.healthService.checkDatabase();
+        if (isUp) {
+          return {
+            database: {
+              status: 'up',
+            },
+          };
+        }
+        throw new Error('Database check failed');
+      },
+      // Redis check
+      async () => {
+        const isUp = await this.healthService.checkRedis();
+        if (isUp) {
+          return {
+            redis: {
+              status: 'up',
+            },
+          };
+        }
+        throw new Error('Redis check failed');
+      },
     ]);
-
-    return {
-      status: 'ok',
-      db,
-      redis,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  @Get('ready')
-  async ready() {
-    const [db, redis] = await Promise.all([
-      this.healthService.checkDatabase(),
-      this.healthService.checkRedis(),
-    ]);
-
-    const ready = db && redis;
-
-    return {
-      status: ready ? 'ready' : 'degraded',
-      db,
-      redis,
-      timestamp: new Date().toISOString(),
-    };
   }
 }

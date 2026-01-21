@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/alerts/status-badge';
 import { SeverityBadge } from '@/components/alerts/severity-badge';
+import { Pencil, Save, X } from 'lucide-react';
 
 interface AlertDetail {
   id: string;
@@ -35,6 +37,12 @@ interface AlertDetail {
   }>;
 }
 
+interface User {
+  id: string;
+  displayName: string | null;
+  email: string;
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleString();
@@ -60,9 +68,17 @@ export default function AlertDetailPage() {
   const id = params.id as string;
   
   const [alert, setAlert] = useState<AlertDetail | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  
+  // Edit State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<{ assigneeUserId: string; runbookUrl: string }>({
+    assigneeUserId: '',
+    runbookUrl: '',
+  });
 
   const fetchAlert = useCallback(async () => {
     try {
@@ -70,19 +86,38 @@ export default function AlertDetailPage() {
       if (!res.ok) throw new Error('Failed to fetch alert');
       const data = await res.json();
       setAlert(data);
+      if (!isEditing) { // Only update form if not editing to avoid overwriting user input
+        setEditForm({
+          assigneeUserId: data.assignee?.id || '',
+          runbookUrl: data.runbookUrl || '',
+        });
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, isEditing]);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/users');
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch users', err);
+    }
+  }, []);
 
   useEffect(() => {
     fetchAlert();
+    fetchUsers();
     const interval = setInterval(fetchAlert, 15000);
     return () => clearInterval(interval);
-  }, [fetchAlert]);
+  }, [fetchAlert, fetchUsers]);
 
   const handleAction = async (action: 'acknowledge' | 'resolve' | 'snooze') => {
     try {
@@ -91,6 +126,29 @@ export default function AlertDetailPage() {
       if (res.ok) fetchAlert();
     } catch (err) {
       console.error(`Failed to ${action}:`, err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      setActionLoading(true);
+      const res = await fetch(`/api/alert-groups/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assigneeUserId: editForm.assigneeUserId || null,
+          runbookUrl: editForm.runbookUrl || null,
+        }),
+      });
+
+      if (res.ok) {
+        setIsEditing(false);
+        fetchAlert();
+      }
+    } catch (err) {
+      console.error('Failed to update alert:', err);
     } finally {
       setActionLoading(false);
     }
@@ -176,7 +234,26 @@ export default function AlertDetailPage() {
       {/* Metadata */}
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl p-6">
-          <h3 className="font-medium text-gray-900 mb-4">Details</h3>
+          <div className="flex items-center justify-between mb-4">
+             <h3 className="font-medium text-gray-900">Details</h3>
+             {!isEditing ? (
+               <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>
+                 <Pencil className="w-4 h-4 mr-2" />
+                 Edit
+               </Button>
+             ) : (
+               <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} disabled={actionLoading}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" onClick={handleSaveEdit} disabled={actionLoading}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save
+                  </Button>
+               </div>
+             )}
+          </div>
+          
           <dl className="space-y-3">
             <div className="flex justify-between">
               <dt className="text-gray-500">First Seen</dt>
@@ -190,25 +267,53 @@ export default function AlertDetailPage() {
               <dt className="text-gray-500">Event Count</dt>
               <dd className="font-mono font-medium">{alert.count}</dd>
             </div>
-            <div className="flex justify-between">
+            
+            <div className="flex justify-between items-center h-9">
               <dt className="text-gray-500">Assignee</dt>
-              <dd className="font-medium">{alert.assignee?.displayName || 'Unassigned'}</dd>
-            </div>
-            {alert.runbookUrl && (
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Runbook</dt>
-                <dd>
-                  <a
-                    href={alert.runbookUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
+              <dd className="font-medium min-w-[200px] text-right">
+                {isEditing ? (
+                  <select
+                    className="w-full px-2 py-1 border rounded text-sm bg-white"
+                    value={editForm.assigneeUserId}
+                    onChange={(e) => setEditForm({ ...editForm, assigneeUserId: e.target.value })}
                   >
-                    View Runbook
-                  </a>
-                </dd>
-              </div>
-            )}
+                    <option value="">Unassigned</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.displayName || u.email}</option>
+                    ))}
+                  </select>
+                ) : (
+                  alert.assignee?.displayName || 'Unassigned'
+                )}
+              </dd>
+            </div>
+
+            <div className="flex justify-between items-center min-h-[36px]">
+              <dt className="text-gray-500">Runbook</dt>
+              <dd className="font-medium min-w-[200px] text-right">
+                {isEditing ? (
+                   <Input 
+                      className="h-8 text-sm"
+                      placeholder="https://..."
+                      value={editForm.runbookUrl}
+                      onChange={(e) => setEditForm({...editForm, runbookUrl: e.target.value})}
+                   />
+                ) : (
+                  alert.runbookUrl ? (
+                    <a
+                      href={alert.runbookUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      View Runbook
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 text-sm">None</span>
+                  )
+                )}
+              </dd>
+            </div>
           </dl>
         </div>
 

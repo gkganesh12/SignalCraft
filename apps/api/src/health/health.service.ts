@@ -4,6 +4,21 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class HealthService {
+  private redisClient: Redis | undefined;
+
+  constructor() {
+    const redisUrl = process.env.REDIS_URL;
+    if (redisUrl) {
+      // Use lazy connection or handle error? ioredis handles reconnection.
+      this.redisClient = new Redis(redisUrl, {
+        maxRetriesPerRequest: 1,
+        lazyConnect: true // Connect on first use
+      });
+      // Handle error to prevent crash
+      this.redisClient.on('error', (err) => { });
+    }
+  }
+
   async checkDatabase(): Promise<boolean> {
     try {
       await prisma.$queryRaw`SELECT 1`;
@@ -14,19 +29,18 @@ export class HealthService {
   }
 
   async checkRedis(): Promise<boolean> {
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) {
+    if (!this.redisClient) {
       return false;
     }
-
-    const client = new Redis(redisUrl, { maxRetriesPerRequest: null });
     try {
-      const pong = await client.ping();
+      // Ensure connected
+      if (this.redisClient.status !== 'ready' && this.redisClient.status !== 'connect') {
+        await this.redisClient.connect().catch(() => { });
+      }
+      const pong = await this.redisClient.ping();
       return pong === 'PONG';
     } catch {
       return false;
-    } finally {
-      await client.quit();
     }
   }
 }

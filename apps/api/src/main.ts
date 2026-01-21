@@ -7,9 +7,14 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import express from 'express';
 
+import helmet from 'helmet';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  app.use(helmet());
+  app.enableShutdownHooks();
+
   app.use('/webhooks/clerk', express.raw({ type: '*/*' }));
   app.use('/webhooks/sentry', express.raw({ type: '*/*' }));
   app.use('/webhooks/slack/actions', express.raw({ type: '*/*' }));

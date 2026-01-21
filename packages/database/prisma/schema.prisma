@@ -118,6 +118,7 @@ model AlertEvent {
   @@unique([workspaceId, sourceEventId])
   @@index([workspaceId])
   @@index([alertGroupId])
+  @@index([alertGroupId, occurredAt]) // Phase 6: Timeline optimization
 }
 
 model AlertGroup {
@@ -147,7 +148,10 @@ model AlertGroup {
   @@index([groupKey])
   @@index([workspaceId])
   @@index([status])
-  @@index([lastSeenAt])  // Phase 4: For auto-close queries
+  @@index([lastSeenAt])
+  @@index([workspaceId, status, lastSeenAt]) // Phase 6: Inbox optimization
+  @@index([workspaceId, environment])        // Phase 6: Filter optimization
+  @@index([workspaceId, project])            // Phase 6: Filter optimization
 }
 
 model RoutingRule {

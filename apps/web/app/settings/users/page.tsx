@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { UserPlus, Mail } from 'lucide-react';
 
 interface User {
   id: string;
+  displayName: string;
   email: string;
-  displayName: string | null;
   role: string;
   createdAt: string;
 }
@@ -17,91 +17,85 @@ export default function UsersSettingsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch users - mock for now
-    const fetchUsers = async () => {
-      try {
-        // In production, call the API
-        setUsers([
-          {
-            id: 'usr_1',
-            email: 'admin@example.com',
-            displayName: 'Admin User',
-            role: 'OWNER',
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-      } catch (err) {
-        console.error('Failed to fetch users:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUsers();
+    fetch('/api/settings/users')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setUsers(data);
+        }
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setLoading(false));
   }, []);
 
-  const getRoleBadge = (role: string) => {
-    const colors: Record<string, string> = {
-      OWNER: 'bg-purple-100 text-purple-700',
-      ADMIN: 'bg-blue-100 text-blue-700',
-      MEMBER: 'bg-gray-100 text-gray-700',
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[role] || colors.MEMBER}`}>
-        {role}
-      </span>
-    );
-  };
+  if (loading) {
+    return <div>Loading users...</div>;
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-500 mt-1">Manage workspace members and roles</p>
+          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+          <p className="text-gray-500">Manage team members and roles</p>
         </div>
-        <Button>Invite User</Button>
+        <Button>
+          <UserPlus className="w-4 h-4 mr-2" />
+          Invite User
+        </Button>
       </div>
 
-      <div className="bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-xl overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {user.displayName || 'No name'}
-                      </p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium">
+                      {(user.displayName || user.email).charAt(0).toUpperCase()}
                     </div>
-                  </TableCell>
-                  <TableCell>{getRoleBadge(user.role)}</TableCell>
-                  <TableCell className="text-gray-500">
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm">
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-gray-900">{user.displayName || 'Unknown Name'}</div>
+                      <div className="text-sm text-gray-500 flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        {user.email}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    user.role === 'ADMIN' || user.role === 'OWNER' 
+                      ? 'bg-purple-100 text-purple-800' 
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {user.role}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {new Date(user.createdAt).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <Button variant="ghost" size="sm">Edit</Button>
+                </td>
+              </tr>
+            ))}
+            {users.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">No users found</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

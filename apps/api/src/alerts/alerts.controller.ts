@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Param, Query, UseGuards, NotFoundException, Post } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, UseGuards, NotFoundException, Post, Patch, Body } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { AlertsService, AlertGroupFilters, PaginationOptions, SortOptions } from './alerts.service';
 import { ClerkAuthGuard } from '../auth/clerk-auth.guard';
@@ -122,6 +122,19 @@ export class AlertsController {
   ) {
     const durationMinutes = duration ? parseInt(duration, 10) : 60;
     const result = await this.alertsService.snoozeAlert(workspaceId, groupId, durationMinutes);
+    if (!result) {
+      throw new NotFoundException('Alert group not found');
+    }
+    return result;
+  }
+
+  @Patch(':id')
+  async updateAlertGroup(
+    @WorkspaceId() workspaceId: string,
+    @Param('id') groupId: string,
+    @Body() body: { assigneeUserId?: string; runbookUrl?: string },
+  ) {
+    const result = await this.alertsService.updateAlertGroup(workspaceId, groupId, body);
     if (!result) {
       throw new NotFoundException('Alert group not found');
     }

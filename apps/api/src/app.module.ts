@@ -17,6 +17,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { RoutingModule } from './routing/routing.module';
 import { EscalationsModule } from './escalations/escalations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -38,6 +39,11 @@ import { DashboardModule } from './dashboard/dashboard.module';
               target: 'pino-pretty',
               options: { colorize: true, singleLine: true },
             },
+        redact: {
+          paths: ['req.headers.authorization', 'req.headers.cookie', 'req.body.password', 'req.body.token'],
+          remove: true,
+        },
+        autoLogging: true,
       },
     }),
     ThrottlerModule.forRoot([
@@ -58,6 +64,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     RoutingModule,
     EscalationsModule,
     DashboardModule,
+    SettingsModule,
   ],
   providers: [
     {
