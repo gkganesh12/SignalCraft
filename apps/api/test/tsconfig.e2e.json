@@ -1,0 +1,15 @@
+{
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "es2019",
+        "types": [
+            "jest",
+            "node",
+            "supertest"
+        ]
+    },
+    "include": [
+        "**/*.e2e-spec.ts"
+    ]
+}
