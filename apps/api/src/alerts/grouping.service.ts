@@ -61,6 +61,7 @@ export class GroupingService {
             title: alert.title,
             severity: normalizeSeverity(alert.severity),
             environment: alert.environment,
+            project: alert.project, // Phase 5: Store project for filtering
             status: AlertStatus.OPEN,
             firstSeenAt: alert.occurredAt,
             lastSeenAt: alert.occurredAt,

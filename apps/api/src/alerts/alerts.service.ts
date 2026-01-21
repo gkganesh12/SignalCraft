@@ -2,6 +2,36 @@ import { Injectable } from '@nestjs/common';
 import { prisma, AlertSeverity, Prisma, AlertStatus } from '@signalcraft/database';
 import { NormalizedAlert } from '@signalcraft/shared';
 
+export interface AlertGroupFilters {
+  status?: AlertStatus[];
+  severity?: AlertSeverity[];
+  environment?: string[];
+  project?: string[];
+  search?: string;
+  startDate?: Date;
+  endDate?: Date;
+}
+
+export interface PaginationOptions {
+  page: number;
+  limit: number;
+}
+
+export interface SortOptions {
+  sortBy: 'lastSeenAt' | 'firstSeenAt' | 'severity' | 'count' | 'status';
+  sortOrder: 'asc' | 'desc';
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
 @Injectable()
 export class AlertsService {
   async isDuplicate(workspaceId: string, sourceEventId: string) {
@@ -37,6 +67,123 @@ export class AlertsService {
     });
   }
 
+  /**
+   * List alert groups with full filtering, pagination, and sorting
+   */
+  async listAlertGroups(
+    workspaceId: string,
+    filters: AlertGroupFilters = {},
+    pagination: PaginationOptions = { page: 1, limit: 20 },
+    sort: SortOptions = { sortBy: 'lastSeenAt', sortOrder: 'desc' },
+  ): Promise<PaginatedResult<Prisma.AlertGroupGetPayload<{ include: { assignee: true } }>>> {
+    const where: Prisma.AlertGroupWhereInput = {
+      workspaceId,
+    };
+
+    // Apply filters
+    if (filters.status?.length) {
+      where.status = { in: filters.status };
+    }
+    if (filters.severity?.length) {
+      where.severity = { in: filters.severity };
+    }
+    if (filters.environment?.length) {
+      where.environment = { in: filters.environment };
+    }
+    if (filters.project?.length) {
+      where.project = { in: filters.project };
+    }
+    if (filters.search) {
+      where.title = { contains: filters.search, mode: 'insensitive' };
+    }
+    if (filters.startDate) {
+      where.lastSeenAt = { ...where.lastSeenAt as object, gte: filters.startDate };
+    }
+    if (filters.endDate) {
+      where.lastSeenAt = { ...where.lastSeenAt as object, lte: filters.endDate };
+    }
+
+    // Build orderBy
+    const orderBy: Prisma.AlertGroupOrderByWithRelationInput = {
+      [sort.sortBy]: sort.sortOrder,
+    };
+
+    // Get total count
+    const total = await prisma.alertGroup.count({ where });
+
+    // Calculate pagination
+    const skip = (pagination.page - 1) * pagination.limit;
+    const totalPages = Math.ceil(total / pagination.limit);
+
+    // Get data
+    const data = await prisma.alertGroup.findMany({
+      where,
+      orderBy,
+      skip,
+      take: pagination.limit,
+      include: {
+        assignee: true,
+      },
+    });
+
+    return {
+      data,
+      total,
+      page: pagination.page,
+      limit: pagination.limit,
+      totalPages,
+      hasNext: pagination.page < totalPages,
+      hasPrevious: pagination.page > 1,
+    };
+  }
+
+  /**
+   * Get detailed alert group with events and notification history
+   */
+  async getAlertGroupDetail(workspaceId: string, groupId: string) {
+    const group = await prisma.alertGroup.findFirst({
+      where: { id: groupId, workspaceId },
+      include: {
+        assignee: true,
+        alertEvents: {
+          orderBy: { occurredAt: 'desc' },
+          take: 50,
+        },
+        notifications: {
+          orderBy: { sentAt: 'desc' },
+          take: 20,
+        },
+      },
+    });
+
+    return group;
+  }
+
+  /**
+   * Get filter options (unique values for dropdowns)
+   */
+  async getFilterOptions(workspaceId: string) {
+    const [environments, projects] = await Promise.all([
+      prisma.alertGroup.findMany({
+        where: { workspaceId },
+        select: { environment: true },
+        distinct: ['environment'],
+      }),
+      prisma.alertGroup.findMany({
+        where: { workspaceId },
+        select: { project: true },
+        distinct: ['project'],
+      }),
+    ]);
+
+    return {
+      environments: environments.map((e) => e.environment),
+      projects: projects.map((p) => p.project),
+      statuses: Object.values(AlertStatus),
+      severities: Object.values(AlertSeverity),
+    };
+  }
+
   async listGroups(workspaceId: string, status?: string) {
     return prisma.alertGroup.findMany({
       where: {
@@ -57,6 +204,71 @@ export class AlertsService {
     return prisma.alertEvent.findMany({
       where: { workspaceId, alertGroupId: groupId },
       orderBy: { occurredAt: 'desc' },
+    });
+  }
+
+  /**
+   * Acknowledge an alert group
+   */
+  async acknowledgeAlert(workspaceId: string, groupId: string, userId?: string) {
+    const alert = await prisma.alertGroup.findFirst({
+      where: { id: groupId, workspaceId },
+    });
+
+    if (!alert) {
+      return null;
+    }
+
+    return prisma.alertGroup.update({
+      where: { id: groupId },
+      data: {
+        status: AlertStatus.ACK,
+        assigneeUserId: userId ?? alert.assigneeUserId,
+      },
+    });
+  }
+
+  /**
+   * Resolve an alert group
+   */
+  async resolveAlert(workspaceId: string, groupId: string) {
+    const alert = await prisma.alertGroup.findFirst({
+      where: { id: groupId, workspaceId },
+    });
+
+    if (!alert) {
+      return null;
+    }
+
+    return prisma.alertGroup.update({
+      where: { id: groupId },
+      data: {
+        status: AlertStatus.RESOLVED,
+        resolvedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Snooze an alert group for a duration
+   */
+  async snoozeAlert(workspaceId: string, groupId: string, durationMinutes = 60) {
+    const alert = await prisma.alertGroup.findFirst({
+      where: { id: groupId, workspaceId },
+    });
+
+    if (!alert) {
+      return null;
+    }
+
+    const snoozeUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
+
+    return prisma.alertGroup.update({
+      where: { id: groupId },
+      data: {
+        status: AlertStatus.SNOOZED,
+        snoozeUntil,
+      },
     });
   }
 
@@ -92,3 +304,4 @@ export class AlertsService {
     return undefined;
   }
 }
+
