@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 18
           cache: npm
-      - run: npm install
+      - run: npm ci
       - run: npm run lint
 
   typecheck:
@@ -29,34 +29,100 @@ jobs:
         with:
           node-version: 18
           cache: npm
-      - run: npm install
+      - run: npm ci
       - run: npm run typecheck
 
-  test:
+  test-unit:
     runs-on: ubuntu-latest
     needs: typecheck
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: signalcraft
+          POSTGRES_PASSWORD: signalcraft
+          POSTGRES_DB: signalcraft_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    env:
+      DATABASE_URL: postgresql://signalcraft:signalcraft@localhost:5432/signalcraft_test
+      REDIS_URL: redis://localhost:6379
+      CLERK_SECRET_KEY: test_clerk_secret
+      CLERK_JWT_PUBLIC_KEY: test_jwt_key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: npm
-      - run: npm install
+      - run: npm ci
+      - name: Run database migrations
+        run: cd packages/database && npx prisma migrate deploy
       - run: npm run test
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: |
+            apps/*/coverage
+            packages/*/coverage
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    needs: typecheck
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright
+        run: cd apps/web && npx playwright install --with-deps chromium
+      - name: Run Playwright tests
+        run: cd apps/web && npx playwright test
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:5050
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
 
   build:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test-unit, test-e2e]
     env:
-      DATABASE_URL: postgres://signalcraft:signalcraft@localhost:5432/signalcraft
+      DATABASE_URL: postgresql://signalcraft:signalcraft@localhost:5432/signalcraft
       CLERK_SECRET_KEY: test_clerk_secret
       CLERK_JWT_PUBLIC_KEY: test_jwt_key
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: test_clerk_publishable
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:5050
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: npm
-      - run: npm install
+      - run: npm ci
+      - name: Generate Prisma Client
+        run: cd packages/database && npx prisma generate
       - run: npm run build

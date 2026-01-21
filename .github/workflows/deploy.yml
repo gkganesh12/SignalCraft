@@ -1,0 +1,80 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Generate Prisma Client
+        run: cd packages/database && npx prisma generate
+      
+      - name: Build applications
+        run: npm run build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_JWT_PUBLIC_KEY: ${{ secrets.CLERK_JWT_PUBLIC_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.NEXT_PUBLIC_API_BASE_URL }}
+      
+      - name: Build Docker images
+        run: |
+          docker build -t signalcraft-api:${{ github.sha }} -f apps/api/Dockerfile .
+          docker build -t signalcraft-web:${{ github.sha }} -f apps/web/Dockerfile .
+      
+      # Placeholder for registry push
+      # - name: Push to container registry
+      #   run: |
+      #     echo "${{ secrets.REGISTRY_TOKEN }}" | docker login -u ${{ secrets.REGISTRY_USER }} --password-stdin
+      #     docker tag signalcraft-api:${{ github.sha }} registry.example.com/signalcraft-api:${{ github.sha }}
+      #     docker tag signalcraft-web:${{ github.sha }} registry.example.com/signalcraft-web:${{ github.sha }}
+      #     docker push registry.example.com/signalcraft-api:${{ github.sha }}
+      #     docker push registry.example.com/signalcraft-web:${{ github.sha }}
+      
+      # Placeholder for deployment
+      # - name: Deploy to environment
+      #   run: |
+      #     # Example: kubectl set image deployment/api api=registry.example.com/signalcraft-api:${{ github.sha }}
+      #     # Example: kubectl set image deployment/web web=registry.example.com/signalcraft-web:${{ github.sha }}
+      #     echo "Deployment to ${{ github.event.inputs.environment || 'staging' }} would happen here"
+      
+      - name: Run database migrations
+        run: cd packages/database && npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      
+      - name: Deployment summary
+        run: |
+          echo "### Deployment Summary :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ github.event.inputs.environment || 'staging' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
