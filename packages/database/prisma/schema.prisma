@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 enum WorkspaceRole {
@@ -21,6 +22,13 @@ enum IntegrationType {
   TEAMS
   DISCORD
   OPSGENIE
+  AWS_CLOUDWATCH
+  AZURE_MONITOR
+  GCP_MONITORING
+  PROMETHEUS
+  GRAFANA
+  GENERIC_WEBHOOK
+  JIRA
 }
 
 enum IntegrationStatus {
@@ -49,6 +57,21 @@ enum NotificationTarget {
   TEAMS
   DISCORD
   DATADOG
+  PAGERDUTY
+  OPSGENIE
+}
+
+enum PagingChannel {
+  SLACK
+  EMAIL
+  SMS
+  VOICE
+}
+
+enum PagingAttemptStatus {
+  QUEUED
+  SENT
+  FAILED
 }
 
 enum NotificationStatus {
@@ -61,6 +84,55 @@ enum InvitationStatus {
   ACCEPTED
   REVOKED
   EXPIRED
+}
+
+enum IncidentRole {
+  COMMANDER
+  SCRIBE
+  LIAISON
+  TECH_LEAD
+}
+
+enum IncidentTimelineEventType {
+  ALERT_CREATED
+  ALERT_ACKED
+  ALERT_SNOOZED
+  ALERT_RESOLVED
+  WAR_ROOM_CREATED
+  CONFERENCE_LINK_SET
+  JIRA_TICKET_CREATED
+  ROUTING_NOTIFICATION
+  DEPLOYMENT_CORRELATED
+  POST_MORTEM_CREATED
+  POST_MORTEM_PUBLISHED
+  ACTION_ITEM_CREATED
+  COMMENT_ADDED
+  ROLE_ASSIGNED
+}
+
+enum PostMortemStatus {
+  DRAFT
+  REVIEWING
+  PUBLISHED
+}
+
+enum StatusPageVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum StatusIncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  MONITORING
+  RESOLVED
+}
+
+enum StatusIncidentImpact {
+  NONE
+  MINOR
+  MAJOR
+  CRITICAL
 }
 
 model Workspace {
@@ -84,13 +156,25 @@ model Workspace {
   releases         Release[]
   uptimeChecks     UptimeCheck[]
   apiKeys          ApiKey[]
+  serviceAccounts  ServiceAccount[]
+  idempotencyKeys  IdempotencyKey[]
+  teams            Team[]
+  escalationPolicies EscalationPolicy[]
+  alertPolicies    AlertPolicy[]
   emailIntegration EmailIntegration?
   auditLogs        AuditLog[]
+  changeEvents     ChangeEvent[]
   samlConfig       SamlConfig?
   rolePermissions  RolePermission[]
   invitations      Invitation[]
   remediationWorkflows RemediationWorkflow[]
   customDashboards     CustomDashboard[]
+  onCallRotations     OnCallRotation[]
+  pagingPolicies      PagingPolicy[]
+  statusPages        StatusPage[]
+  anomalyModels      AnomalyModel[]
+  postMortems        PostMortem[]
+  webhookRegistries  WebhookRegistry[]
 }
 
 model AuditLog {
@@ -114,6 +198,26 @@ model AuditLog {
   @@index([resourceType, resourceId])
 }
 
+model IdempotencyKey {
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String
+  method      String
+  path        String
+  requestHash String
+  status      String   @default("IN_PROGRESS")
+  statusCode  Int?
+  responseBody Json?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+}
+
 model ApiKey {
   id          String    @id @default(cuid())
   workspaceId String
@@ -123,14 +227,17 @@ model ApiKey {
   lastUsedAt  DateTime?
   expiresAt   DateTime?
   createdBy   String
+  serviceAccountId String?
   createdAt   DateTime  @default(now())
   revokedAt   DateTime?
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
   creator   User      @relation(fields: [createdBy], references: [id])
+  serviceAccount ServiceAccount? @relation(fields: [serviceAccountId], references: [id])
 
   @@index([workspaceId])
   @@index([keyHash])
+  @@index([serviceAccountId])
   @@index([workspaceId, createdAt])
 }
 
@@ -191,6 +298,7 @@ model User {
   clerkId     String        @unique
   email       String        @unique
   displayName String?
+  phoneNumber String?
   role        WorkspaceRole @default(MEMBER)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -198,12 +306,250 @@ model User {
   workspace           Workspace    @relation(fields: [workspaceId], references: [id])
   assignedAlertGroups AlertGroup[] @relation("AlertGroupAssignee")
   apiKeys             ApiKey[]
+  serviceAccountsCreated ServiceAccount[] @relation("ServiceAccountCreator")
+  teamsCreated        Team[] @relation("TeamCreator")
+  teamMemberships     TeamMember[]
+  escalationPoliciesCreated EscalationPolicy[] @relation("EscalationPolicyCreator")
+  alertPoliciesCreated AlertPolicy[] @relation("AlertPolicyCreator")
   auditLogs           AuditLog[]
   invitationsCreated  Invitation[] @relation("Inviter")
   workflowsCreated    RemediationWorkflow[] @relation("WorkflowCreator")
   dashboardsCreated   CustomDashboard[] @relation("DashboardCreator")
+  onCallRotationsCreated OnCallRotation[] @relation("OnCallRotationCreator")
+  onCallLayerParticipants OnCallParticipant[]
+  onCallOverrides      OnCallOverride[] @relation("OnCallOverrideUser")
+  onCallOverridesCreated OnCallOverride[] @relation("OnCallOverrideCreator")
+  pagingAttempts       PagingAttempt[]
+  incidentRoleAssignments IncidentRoleAssignment[]
+  comments             Comment[]
+  assignedActionItems ActionItem[]
 
   @@index([workspaceId])
+}
+
+model ServiceAccount {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  creator   User?      @relation("ServiceAccountCreator", fields: [createdBy], references: [id])
+  apiKeys   ApiKey[]
+
+  @@index([workspaceId])
+  @@index([createdBy])
+  @@unique([workspaceId, name])
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  creator   User?     @relation("TeamCreator", fields: [createdBy], references: [id])
+  members   TeamMember[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([createdBy])
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model EscalationPolicy {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  rulesJson   Json
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  creator   User?     @relation("EscalationPolicyCreator", fields: [createdBy], references: [id])
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([createdBy])
+}
+
+model AlertPolicy {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  externalId  String?
+  severity    String
+  routingKey  String
+  conditionsJson Json
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  creator   User?     @relation("AlertPolicyCreator", fields: [createdBy], references: [id])
+
+  @@index([workspaceId])
+  @@index([workspaceId, name])
+  @@unique([workspaceId, externalId])
+  @@index([createdBy])
+}
+
+model OnCallRotation {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  timezone    String   @default("UTC")
+  description String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  creator   User      @relation("OnCallRotationCreator", fields: [createdBy], references: [id])
+  layers    OnCallLayer[]
+  overrides OnCallOverride[]
+  pagingPolicies PagingPolicy[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, updatedAt])
+}
+
+model PagingPolicy {
+  id          String   @id @default(cuid())
+  workspaceId String
+  rotationId  String
+  name        String
+  description String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  rotation  OnCallRotation @relation(fields: [rotationId], references: [id])
+  steps     PagingStep[]
+  attempts  PagingAttempt[]
+
+  @@index([workspaceId])
+  @@index([rotationId])
+}
+
+model PagingStep {
+  id                    String   @id @default(cuid())
+  policyId              String
+  order                 Int      @default(0)
+  channels              PagingChannel[]
+  delaySeconds          Int      @default(0)
+  repeatCount           Int      @default(0)
+  repeatIntervalSeconds Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  policy PagingPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([policyId])
+  @@index([policyId, order])
+}
+
+model PagingAttempt {
+  id           String             @id @default(cuid())
+  policyId     String
+  alertGroupId String
+  channel      PagingChannel
+  status       PagingAttemptStatus
+  targetUserId String?
+  stepOrder    Int
+  attemptNumber Int              @default(1)
+  errorMessage String?
+  ackToken     String?
+  ackedAt      DateTime?
+  ackSource    String?
+  startedAt    DateTime          @default(now())
+  completedAt  DateTime?
+
+  policy     PagingPolicy @relation(fields: [policyId], references: [id])
+  alertGroup AlertGroup   @relation(fields: [alertGroupId], references: [id])
+  targetUser User?        @relation(fields: [targetUserId], references: [id])
+
+  @@index([policyId])
+  @@index([alertGroupId])
+  @@index([targetUserId])
+  @@index([policyId, alertGroupId])
+}
+
+model OnCallLayer {
+  id                   String   @id @default(cuid())
+  rotationId           String
+  name                 String?
+  order                Int      @default(0)
+  handoffIntervalHours Int      @default(168)
+  startsAt             DateTime
+  endsAt               DateTime?
+  restrictionsJson     Json?
+  isShadow             Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  rotation     OnCallRotation    @relation(fields: [rotationId], references: [id], onDelete: Cascade)
+  participants OnCallParticipant[]
+
+  @@index([rotationId])
+  @@index([rotationId, order])
+}
+
+model OnCallParticipant {
+  id       String   @id @default(cuid())
+  layerId  String
+  userId   String
+  position Int      @default(0)
+  createdAt DateTime @default(now())
+
+  layer OnCallLayer @relation(fields: [layerId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id])
+
+  @@index([layerId])
+  @@index([userId])
+  @@index([layerId, position])
+}
+
+model OnCallOverride {
+  id         String   @id @default(cuid())
+  rotationId String
+  userId     String
+  startsAt   DateTime
+  endsAt     DateTime
+  reason     String?
+  createdBy  String
+  createdAt  DateTime @default(now())
+
+  rotation OnCallRotation @relation(fields: [rotationId], references: [id], onDelete: Cascade)
+  user     User           @relation("OnCallOverrideUser", fields: [userId], references: [id])
+  creator  User           @relation("OnCallOverrideCreator", fields: [createdBy], references: [id])
+
+  @@index([rotationId])
+  @@index([userId])
+  @@index([rotationId, startsAt])
 }
 
 model Integration {
@@ -219,6 +565,28 @@ model Integration {
 
   @@unique([workspaceId, type])
   @@index([workspaceId])
+}
+
+model WebhookRegistry {
+  id              String          @id @default(cuid())
+  workspaceId     String
+  name            String
+  integrationType IntegrationType
+  webhookUrl      String          @unique // Generated URL
+  webhookToken    String          @unique // Secret token for validation
+  enabled         Boolean         @default(true)
+
+  // Generic webhook configuration
+  fieldMappings Json? // JSONPath mappings for title, severity, etc.
+  severityMap   Json? // Custom severity mapping
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([webhookToken])
 }
 
 model AlertEvent {
@@ -297,6 +665,7 @@ model AlertGroup {
   lastSeenAt     DateTime
   count          Int           @default(1)
   runbookUrl     String?
+  runbookMarkdown String?
   snoozeUntil    DateTime? // Phase 4: Alert hygiene - snooze expiry
   resolvedAt     DateTime? // Phase 4: Track when alert was resolved
 
@@ -312,6 +681,15 @@ model AlertGroup {
   // Release Tracking
   releaseId String?
 
+  // Jira Ticketing
+  jiraIssueKey String?
+  jiraIssueUrl String?
+
+  // Incident Management
+  conferenceUrl     String?
+  warRoomChannelId  String?
+  warRoomChannelName String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -320,9 +698,16 @@ model AlertGroup {
   release       Release?          @relation(fields: [releaseId], references: [id])
   notifications NotificationLog[]
   alertEvents   AlertEvent[]
+  incidentRoleAssignments IncidentRoleAssignment[]
+  incidentTimelineEntries IncidentTimelineEntry[]
+  statusPageIncidents StatusPageIncident[]
   workflowExecutions WorkflowExecution[]
   primaryCorrelations AlertCorrelation[] @relation("PrimaryAlert")
   relatedCorrelations AlertCorrelation[] @relation("RelatedAlert")
+  pagingAttempts   PagingAttempt[]
+  externalMappings ExternalMapping[]
+  postMortem       PostMortem?
+  comments         Comment[]
 
   @@index([groupKey])
   @@index([workspaceId])
@@ -334,11 +719,146 @@ model AlertGroup {
   @@index([releaseId]) // Release tracking
 }
 
+model ExternalMapping {
+  id              String          @id @default(cuid())
+  alertGroupId    String
+  integrationType IntegrationType
+  externalId      String
+  metadata        Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  alertGroup AlertGroup @relation(fields: [alertGroupId], references: [id])
+
+  @@unique([alertGroupId, integrationType])
+  @@index([externalId])
+}
+
+model StatusPage {
+  id          String               @id @default(cuid())
+  workspaceId String
+  slug        String               @unique
+  title       String
+  description String?
+  visibility  StatusPageVisibility @default(PUBLIC)
+  isActive    Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  workspace   Workspace            @relation(fields: [workspaceId], references: [id])
+  incidents   StatusPageIncident[]
+  subscribers StatusPageSubscriber[]
+
+  @@index([workspaceId])
+}
+
+model StatusPageIncident {
+  id           String               @id @default(cuid())
+  statusPageId String
+  alertGroupId String?
+  title        String
+  status       StatusIncidentStatus
+  impact       StatusIncidentImpact @default(MINOR)
+  message      String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  resolvedAt   DateTime?
+
+  statusPage StatusPage  @relation(fields: [statusPageId], references: [id], onDelete: Cascade)
+  alertGroup AlertGroup? @relation(fields: [alertGroupId], references: [id])
+
+  @@index([statusPageId])
+  @@index([alertGroupId])
+  @@index([statusPageId, status])
+}
+
+model StatusPageSubscriber {
+  id           String   @id @default(cuid())
+  statusPageId String
+  email        String
+  verified     Boolean  @default(false)
+  verifyToken  String
+  unsubscribedAt DateTime?
+  createdAt    DateTime @default(now())
+
+  statusPage StatusPage @relation(fields: [statusPageId], references: [id], onDelete: Cascade)
+
+  @@unique([statusPageId, email])
+  @@index([statusPageId])
+  @@index([email])
+}
+
+model IncidentTimelineEntry {
+  id           String   @id @default(cuid())
+  alertGroupId String
+  type         IncidentTimelineEventType
+  title        String
+  message      String?
+  source       String? // system, user, integration name
+  metadataJson Json?
+  occurredAt   DateTime @default(now())
+
+  alertGroup AlertGroup @relation(fields: [alertGroupId], references: [id], onDelete: Cascade)
+
+  @@index([alertGroupId])
+  @@index([alertGroupId, occurredAt])
+}
+
+model AnomalyModel {
+  id          String   @id @default(cuid())
+  workspaceId String
+  metricKey   String
+  baseline    Json
+  lastUpdated DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, metricKey])
+  @@index([workspaceId])
+}
+
+model ChangeEvent {
+  id          String   @id @default(cuid())
+  workspaceId String
+  type        String
+  source      String
+  title       String?
+  project     String?
+  environment String?
+  actor       String?
+  details     Json?
+  timestamp   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([workspaceId, timestamp])
+  @@index([workspaceId, project])
+  @@index([workspaceId, environment])
+}
+
+model IncidentRoleAssignment {
+  id           String       @id @default(cuid())
+  alertGroupId String
+  userId       String
+  role         IncidentRole
+  createdAt    DateTime     @default(now())
+
+  alertGroup AlertGroup @relation(fields: [alertGroupId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@unique([alertGroupId, role])
+  @@index([alertGroupId])
+  @@index([userId])
+}
+
 model Release {
   id          String   @id @default(cuid())
   workspaceId String
   version     String // e.g., "v2.3.1", "1.0.0-beta"
   environment String // production, staging, development
+  project     String  @default("default")
   commitSha   String? // Git commit SHA
   deployedAt  DateTime @default(now())
   createdAt   DateTime @default(now())
@@ -346,7 +866,7 @@ model Release {
   workspace   Workspace    @relation(fields: [workspaceId], references: [id])
   alertGroups AlertGroup[]
 
-  @@unique([workspaceId, version, environment])
+  @@unique([workspaceId, version, environment, project])
   @@index([workspaceId])
   @@index([workspaceId, deployedAt])
 }
@@ -554,4 +1074,60 @@ model CustomDashboard {
 
   @@index([workspaceId])
   @@index([createdBy])
+}
+
+model PostMortem {
+  id              String           @id @default(cuid())
+  alertGroupId    String           @unique
+  workspaceId     String
+  status          PostMortemStatus @default(DRAFT)
+  title           String
+  summary         String?          @db.Text
+  impact          String?          @db.Text
+  rootCause       String?          @db.Text
+  actionItems     ActionItem[]
+  publishedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  alertGroup AlertGroup @relation(fields: [alertGroupId], references: [id], onDelete: Cascade)
+  workspace  Workspace  @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+model ActionItem {
+  id           String   @id @default(cuid())
+  postMortemId String
+  title        String
+  description  String? @db.Text
+  status       String   @default("TODO") // "TODO", "IN_PROGRESS", "DONE", "CANCELLED"
+  priority     String   @default("MEDIUM") // "LOW", "MEDIUM", "HIGH"
+  assigneeId   String?
+  dueDate      DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  postMortem PostMortem @relation(fields: [postMortemId], references: [id], onDelete: Cascade)
+  assignee   User?      @relation(fields: [assigneeId], references: [id])
+}
+
+model Comment {
+  id           String   @id @default(cuid())
+  alertGroupId String
+  userId       String
+  content      String   @db.Text
+  parentId     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  alertGroup AlertGroup @relation(fields: [alertGroupId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id])
+  parent     Comment?   @relation("CommentReplies", fields: [parentId], references: [id])
+  replies    Comment[]  @relation("CommentReplies")
+
+  @@index([alertGroupId])
+  @@index([userId])
+  @@index([parentId])
 }

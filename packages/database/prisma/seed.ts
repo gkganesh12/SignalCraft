@@ -16,7 +16,7 @@ async function main() {
   await prisma.alertEvent.deleteMany();
   await prisma.alertGroup.deleteMany();
   await prisma.routingRule.deleteMany();
-  await prisma.correlationRule.deleteMany();
+  // await prisma.correlationRule.deleteMany(); // Table doesn't exist yet
   await prisma.integration.deleteMany();
   await prisma.user.deleteMany();
   await prisma.workspace.deleteMany();
@@ -302,23 +302,24 @@ async function main() {
   console.log('✅ Created routing rules');
 
   // Create correlation rules (for related alerts)
-  await prisma.correlationRule.createMany({
-    data: [
-      {
-        workspaceId: workspace.id,
-        sourceGroupKey: 'db-connection-pool-exhausted',
-        targetGroupKey: 'payment-service-timeout',
-        confidence: 0.85,
-      },
-      {
-        workspaceId: workspace.id,
-        sourceGroupKey: 'redis-cache-miss-rate',
-        targetGroupKey: 'payment-service-timeout',
-        confidence: 0.65,
-      },
-    ],
-  });
-  console.log('✅ Created correlation rules');
+  // NOTE: CorrelationRule table doesn't exist yet, commenting out
+  // await prisma.correlationRule.createMany({
+  //   data: [
+  //     {
+  //       workspaceId: workspace.id,
+  //       sourceGroupKey: 'db-connection-pool-exhausted',
+  //       targetGroupKey: 'payment-service-timeout',
+  //       confidence: 0.85,
+  //     },
+  //     {
+  //       workspaceId: workspace.id,
+  //       sourceGroupKey: 'redis-cache-miss-rate',
+  //       targetGroupKey: 'payment-service-timeout',
+  //       confidence: 0.65,
+  //     },
+  //   ],
+  // });
+  // console.log('✅ Created correlation rules');
 
   console.log('\n🎉 Seeding complete!');
   console.log('\n⚠️  IMPORTANT: Update the clerkId in this script with your actual Clerk user ID after signing in.');
