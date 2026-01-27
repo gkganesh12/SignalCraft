@@ -1,0 +1,3 @@
+-- Add Phase 3 integration types
+ALTER TYPE "IntegrationType" ADD VALUE IF NOT EXISTS 'AZURE_MONITOR';
+ALTER TYPE "IntegrationType" ADD VALUE IF NOT EXISTS 'GCP_MONITORING';
