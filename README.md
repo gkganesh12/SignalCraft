@@ -4,7 +4,7 @@ A lightweight "done-right" layer on top of existing monitoring tools that **redu
 
 ## 🎯 Overview
 
-SignalCraft is NOT "another Datadog/Sentry." It's a **better alerting outcomes** system (signal, routing, runbooks, accountability) using what teams already have.
+Nirvana is NOT "another Datadog/Sentry." It's a **better alerting outcomes** system (signal, routing, runbooks, accountability) using what teams already have.
 
 ## ✨ Key Features
 
